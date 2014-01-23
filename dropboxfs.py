@@ -303,6 +303,8 @@ def metadata_to_info(metadata, localtime=False):
     }
     try:
         mtime = metadata.pop('modified', None)
+        if 'client_mtime' in metadata:
+            mtime = metadata.pop('client_mtime')
         if mtime:
             # Parse date/time from Dropbox as struct_time.
             mtime = time.strptime(mtime, TIME_FORMAT)
