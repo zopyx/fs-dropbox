@@ -111,6 +111,38 @@ class SpooledReader(ContextManagerStream):
         return self.bytes
 
 
+class ChunkedReader(ContextManagerStream):
+    """ A file-like that provides access to a file with dropbox API"""
+    """Reads the file from the remote server as requested.
+    It can then satisfy read(), readline()."""
+    def __init__(self, client, name):
+        self.client = client
+        try:
+            self.r = self.client.get_file(name)
+        except rest.ErrorResponse, e:
+            raise RemoteConnectionError(opname='get_file', path=name)
+        self.bytes = int(self.r.getheader('Content-Length')) 
+        self.name = name
+
+    def __len__(self):
+        return self.bytes
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        data = self.read()
+        if data is None:
+            raise StopIteration()
+        return data
+
+    def read(self, size=16384):
+        return self.r.read(size)
+
+    def readline(self):
+        raise NotImplementedError()
+
+
 class CacheItem(object):
     """Represents a path in the cache. There are two components to a path.
     It's individual metadata, and the children contained within it."""
@@ -365,7 +397,7 @@ class DropboxFS(FS):
     @synchronize
     def open(self, path, mode="rb", **kwargs):
         if 'r' in mode:
-            return SpooledReader(self.client, path)
+            return ChunkedReader(self.client, path)
         else:
             return SpooledWriter(self.client, path)
 
