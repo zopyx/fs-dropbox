@@ -114,14 +114,15 @@ class SpooledReader(ContextManagerStream):
 class ChunkedReader(ContextManagerStream):
     """ A file-like that provides access to a file with dropbox API"""
     """Reads the file from the remote server as requested.
-    It can then satisfy read(), readline()."""
+    It can then satisfy read()."""
     def __init__(self, client, name):
         self.client = client
         try:
             self.r = self.client.get_file(name)
         except rest.ErrorResponse, e:
-            raise RemoteConnectionError(opname='get_file', path=name)
-        self.bytes = int(self.r.getheader('Content-Length')) 
+            raise RemoteConnectionError(opname='get_file', path=name,
+                                        details=e)
+        self.bytes = int(self.r.getheader('Content-Length'))
         self.name = name
 
     def __len__(self):
