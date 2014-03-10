@@ -124,6 +124,8 @@ class ChunkedReader(ContextManagerStream):
                                         details=e)
         self.bytes = int(self.r.getheader('Content-Length'))
         self.name = name
+        self.closed = False
+
 
     def __len__(self):
         return self.bytes
@@ -142,6 +144,10 @@ class ChunkedReader(ContextManagerStream):
 
     def readline(self):
         raise NotImplementedError()
+    
+    def close(self):
+        if not self.closed:
+            self.closed = True
 
 
 class CacheItem(object):
