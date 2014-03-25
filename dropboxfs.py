@@ -126,7 +126,6 @@ class ChunkedReader(ContextManagerStream):
         self.name = name
         self.closed = False
 
-
     def __len__(self):
         return self.bytes
 
@@ -140,7 +139,10 @@ class ChunkedReader(ContextManagerStream):
         return data
 
     def read(self, size=16384):
-        return self.r.read(size)
+        if not self.r.isclosed():
+            return self.r.read(size)
+        else:
+            self.close()
 
     def readline(self):
         raise NotImplementedError()
