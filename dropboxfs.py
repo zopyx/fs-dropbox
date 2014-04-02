@@ -139,7 +139,7 @@ class ChunkedReader(ContextManagerStream):
         return data
 
     def read(self, size=16384):
-        if not self.r.isclosed():
+        if not self.r.closed:
             return self.r.read(size)
         else:
             self.close()
@@ -411,11 +411,11 @@ class DropboxFS(FS):
             return SpooledWriter(self.client, path)
 
     @synchronize
-    def getcontents(self, path, mode="rb"):
+    def getcontents(self, path, mode='rb', **kwargs):
         path = abspath(normpath(path))
-        return self.open(self, path, mode).read()
+        return self.open(path, mode, **kwargs).read()
 
-    def setcontents(self, path, data, *args, **kwargs):
+    def setcontents(self, path, data=b'', **kwargs):
         path = abspath(normpath(path))
         self.client.put_file(path, data, overwrite=True)
 
