@@ -328,6 +328,10 @@ class DropboxFS(FS):
     @synchronize
     def open(self, path, mode="rb", **kwargs):
         if 'r' in mode:
+            if not self.exists(path):
+                raise ResourceNotFoundError(path)
+            if self.isdir(path):
+                raise ResourceInvalidError(path)
             return ChunkedReader(self.client, path)
         else:
             return SpooledWriter(self.client, path)
