@@ -384,9 +384,16 @@ class DropboxFS(FS):
         metadata = self.client.metadata(path)
         return metadata_to_info(metadata, localtime=self.localtime)
 
-    def copy(self, src, dst, *args, **kwargs):
+    def copy(self, src, dst, **kwargs):
         src = abspath(normpath(src))
         dst = abspath(normpath(dst))
+
+        if kwargs.get("overwrite", False):
+            try:
+                self.client.file_delete(dst)
+            except ResourceNotFoundError:
+                pass
+
         self.client.file_copy(src, dst)
 
     def copydir(self, src, dst, *args, **kwargs):
@@ -435,9 +442,16 @@ class DropboxFS(FS):
     def move(self, src, dst, *args, **kwargs):
         src = abspath(normpath(src))
         dst = abspath(normpath(dst))
+
+        if kwargs.get("overwrite", False):
+            try:
+                self.client.file_delete(dst)
+            except ResourceNotFoundError:
+                pass
+
         self.client.file_move(src, dst)
 
-    def movedir(self, src, dst, *args, **kwargs):
+    def movedir(self, src, dst, **kwargs):
         src = abspath(normpath(src))
         dst = abspath(normpath(dst))
         self.client.file_move(src, dst)

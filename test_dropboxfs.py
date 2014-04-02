@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 import unittest
+from fs.remote import CacheFS
 from six import b
 from pytest import fixture
 
@@ -65,4 +66,16 @@ class TestExternalDropboxFS(unittest.TestCase, FSTestCases):
 
     def tearDown(self):
         cleanup_dropbox(self.fs)
+        self.fs.close()
+
+
+class TestExternalCachedDropboxFS(unittest.TestCase, FSTestCases):
+    """This will test the CacheFS wrapped around the DropboxFS implementation
+    against the base tests defined in PyFilesystem"""
+    def setUp(self):
+        wrapped_fs = DropboxFS("q3UFckbQggcAAAAAAAAAAdj9VvMFNx18Et2_BZLZxxLxCg6BLu3fLa15m8-qBvpB")
+        self.fs = CacheFS(wrapped_fs)
+
+    def tearDown(self):
+        cleanup_dropbox(self.fs.wrapped_fs)
         self.fs.close()
