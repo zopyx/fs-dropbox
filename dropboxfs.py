@@ -292,7 +292,6 @@ class DropboxFS(FS):
     _meta = { 'thread_safe' : True,
               'virtual' : False,
               'read_only' : False,
-              'unicode_paths' : True,
               'case_insensitive_paths' : True,
               'network' : True,
               'atomic.setcontents' : False,
