@@ -198,14 +198,16 @@ class DropboxClient(client.DropboxClient):
                                             details=e)
         return children
 
-    def file_create_folder(self, path):
+    def file_create_folder(self, path, allow_recreate=False):
         """Add newly created directory to cache."""
         try:
-            metadata = super(DropboxClient, self).file_create_folder(path)
+            super(DropboxClient, self).file_create_folder(path)
         except rest.ErrorResponse, e:
             if e.status == 404:
                 raise ParentDirectoryMissingError(path)
             if e.status == 403:
+                if allow_recreate:
+                    return
                 raise DestinationExistsError(path)
             raise RemoteConnectionError(opname='file_create_folder', path=path,
                                         details=e)
@@ -462,8 +464,22 @@ class DropboxFS(FS):
         self.client.file_move(src, dst)
 
     def makedir(self, path, recursive=False, allow_recreate=False):
+        """
+        Make a directory on the filesystem.
+        This will explicitely test wether the directory exists etc. instead
+        of handling this directly in the DropboxClient.
+        The reason for that is the gained performance when a CacheFS is used
+        to wrap it.
+        """
         path = abspath(normpath(path))
-        self.client.file_create_folder(path)
+        if self.isfile(path):
+            raise ResourceInvalidError(path)
+        if self.isdir(path) and not allow_recreate:
+            raise DestinationExistsError(path)
+        if not recursive and not self.exists(dirname(path)):
+            raise ParentDirectoryMissingError(path)
+
+        self.client.file_create_folder(path, allow_recreate=allow_recreate)
 
     # This does not work, httplib refuses to send a Content-Length: 0 header
     # even though the header is required. We can't make a 0-length file.
