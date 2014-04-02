@@ -68,7 +68,7 @@ class SpooledWriter(ContextManagerStream):
         self.max_buffer = max_buffer
         self.bytes = 0
         super(SpooledWriter, self).__init__(StringIO(), name)
-    
+
     def __len__(self):
         return self.bytes
 
@@ -146,61 +146,10 @@ class ChunkedReader(ContextManagerStream):
 
     def readline(self):
         raise NotImplementedError()
-    
+
     def close(self):
         if not self.closed:
             self.closed = True
-
-
-class CacheItem(object):
-    """Represents a path in the cache. There are two components to a path.
-    It's individual metadata, and the children contained within it."""
-    def __init__(self, metadata=None, children=None, timestamp=None):
-        self.metadata = metadata
-        self.children = children
-        if timestamp is None:
-            timestamp = time.time()
-        self.timestamp = timestamp
-
-    def add_child(self, name):
-        if self.children is None:
-            self.children = [name]
-        else:
-            self.children.append(name)
-
-    def del_child(self, name):
-        if self.children is None:
-            return
-        try:
-            i = self.children.index(name)
-        except ValueError:
-            return
-        self.children.pop(i)
-
-    def _get_expired(self):
-        if self.timestamp <= time.time() - CACHE_TTL:
-            return True
-    expired = property(_get_expired)
-
-    def renew(self):
-        self.timestamp = time.time()
-
-
-class DropboxCache(UserDict):
-    def set(self, path, metadata):
-        self[path] = CacheItem(metadata)
-        dname, bname = pathsplit(path)
-        item = self.get(dname)
-        if item:
-            item.add_child(bname)
-
-    def pop(self, path, default=None):
-        value = UserDict.pop(self, path, default)
-        dname, bname = pathsplit(path)
-        item = self.get(dname)
-        if item:
-            item.del_child(bname)
-        return value
 
 
 class DropboxClient(client.DropboxClient):
@@ -208,70 +157,43 @@ class DropboxClient(client.DropboxClient):
     caching as well as converting errors to fs exceptions."""
     def __init__(self, *args, **kwargs):
         super(DropboxClient, self).__init__(*args, **kwargs)
-        self.cache = DropboxCache()
 
     # Below we split the DropboxClient metadata() method into two methods
     # metadata() and children(). This allows for more fine-grained fetches
-    # and caching.
 
-    def metadata(self, path):
-        "Gets metadata for a given path."
-        item = self.cache.get(path)
-        if not item or item.metadata is None or item.expired:
-            try:
-                metadata = super(DropboxClient, self).metadata(path,
-                    include_deleted=False, list=False)
-            except rest.ErrorResponse, e:
-                if e.status == 404:
-                    raise ResourceNotFoundError(path)
-                raise RemoteConnectionError(opname='metadata', path=path,
-                                            details=e)
-            if metadata.get('is_deleted', False):
+    def metadata(self, path, **kwargs):
+        """Gets metadata for a given path."""
+        try:
+            metadata = super(DropboxClient, self).metadata(path, include_deleted=False, list=False)
+        except rest.ErrorResponse, e:
+            if e.status == 404:
                 raise ResourceNotFoundError(path)
-            item = self.cache[path] = CacheItem(metadata)
-        # Copy the info so the caller cannot affect our cache.
-        return dict(item.metadata.items())
+            raise RemoteConnectionError(opname='metadata', path=path,
+                                        details=e)
+        if metadata.get('is_deleted', False):
+            raise ResourceNotFoundError(path)
+        return dict(metadata.items())
 
     def children(self, path):
         "Gets children of a given path."
         update, hash = False, None
-        item = self.cache.get(path)
-        if item:
-            if item.expired:
-                update = True
-                if item.metadata and item.children:
-                    hash = item.metadata['hash']
-            else:
-                if not item.metadata.get('is_dir'):
-                    raise ResourceInvalidError(path)
-            if not item.children:
-                update = True
-        else:
-            update = True
-        if update:
-            try:
-                metadata = super(DropboxClient, self).metadata(path, hash=hash,
-                    include_deleted=False, list=True)
-                children = []
-                contents = metadata.pop('contents')
-                for child in contents:
-                    if child.get('is_deleted', False):
-                        continue
-                    children.append(basename(child['path']))
-                    self.cache[child['path']] = CacheItem(child)
-                item = self.cache[path] = CacheItem(metadata, children)
-            except rest.ErrorResponse, e:
-                if not item or e.status != 304:
-                    raise RemoteConnectionError(opname='metadata', path=path,
-                                                details=e)
-                # We have an item from cache (perhaps expired), but it's
-                # hash is still valid (as far as Dropbox is concerned),
-                # so just renew it and keep using it.
-                item.renew()
-        return item.children
+        children = []
+        try:
+            metadata = super(DropboxClient, self).metadata(path, hash=hash,
+                                                           include_deleted=False, list=True)
+            contents = metadata.pop('contents')
+            for child in contents:
+                if child.get('is_deleted', False):
+                    continue
+                children.append(basename(child['path']))
+        except rest.ErrorResponse, e:
+            if e.status != 304:
+                raise RemoteConnectionError(opname='metadata', path=path,
+                                            details=e)
+        return children
 
     def file_create_folder(self, path):
-        "Add newly created directory to cache."
+        """Add newly created directory to cache."""
         try:
             metadata = super(DropboxClient, self).file_create_folder(path)
         except rest.ErrorResponse, e:
@@ -281,32 +203,28 @@ class DropboxClient(client.DropboxClient):
                 raise DestinationExistsError(path)
             raise RemoteConnectionError(opname='file_create_folder', path=path,
                                         details=e)
-        self.cache.set(path, metadata)
 
     def file_copy(self, src, dst):
         try:
-            metadata = super(DropboxClient, self).file_copy(src, dst)
+            super(DropboxClient, self).file_copy(src, dst)
         except rest.ErrorResponse, e:
             if e.status == 404:
                 raise ResourceNotFoundError(src)
             if e.status == 403:
                 raise DestinationExistsError(dst)
-            raise RemoteConnectionError(opname='file_copy', path=path,
+            raise RemoteConnectionError(opname='file_copy', path=dst,
                                         details=e)
-        self.cache.set(dst, metadata)
 
     def file_move(self, src, dst):
         try:
-            metadata = super(DropboxClient, self).file_move(src, dst)
+            super(DropboxClient, self).file_move(src, dst)
         except rest.ErrorResponse, e:
             if e.status == 404:
                 raise ResourceNotFoundError(src)
             if e.status == 403:
                 raise DestinationExistsError(dst)
-            raise RemoteConnectionError(opname='file_move', path=path,
+            raise RemoteConnectionError(opname='file_move', path=dst,
                                         details=e)
-        self.cache.pop(src, None)
-        self.cache.set(dst, metadata)
 
     def file_delete(self, path):
         try:
@@ -317,15 +235,13 @@ class DropboxClient(client.DropboxClient):
             if e.status == 400 and 'must not be empty' in str(e):
                 raise DirectoryNotEmptyError(path)
             raise
-        self.cache.pop(path, None)
 
-    def put_file(self, path, f, overwrite=False):
+    def put_file(self, full_path, file_obj, overwrite=False, **kwargs):
         try:
-            metadata = super(DropboxClient, self).put_file(path, f, overwrite=overwrite)
+            super(DropboxClient, self).put_file(full_path, file_obj, overwrite=overwrite)
         except rest.ErrorResponse, e:
-            raise RemoteConnectionError(opname='put_file', path=path,
+            raise RemoteConnectionError(opname='put_file', path=full_path,
                                         details=e)
-        self.cache.pop(dirname(path), None)
 
 
 def create_client(app_key, app_secret, access_type, token_key, token_secret):
@@ -345,7 +261,7 @@ def metadata_to_info(metadata, localtime=False):
     try:
         if 'client_mtime' in metadata:
             mtime = metadata.get('client_mtime')
-        else:    
+        else:
             mtime = metadata.get('modified')
         if mtime:
             # Parse date/time from Dropbox as struct_time.
