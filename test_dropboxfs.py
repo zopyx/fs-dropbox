@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 import unittest
+from six import b
+from pytest import fixture
 
+from fs.errors import ResourceNotFoundError, DestinationExistsError
 from fs.tests import FSTestCases
+
 
 from dropboxfs import DropboxFS, DropboxClient
 
@@ -23,6 +27,35 @@ def patched_init(self, token_secret):
     self.localtime = False
 
 DropboxFS.__init__ = patched_init
+
+
+class TestDropboxFS(object):
+    @fixture
+    def fs(self, request):
+        fs = DropboxFS("q3UFckbQggcAAAAAAAAAAdj9VvMFNx18Et2_BZLZxxLxCg6BLu3fLa15m8-qBvpB")
+        request.addfinalizer(lambda: cleanup_dropbox(fs))
+        return fs
+
+    def test_copydir_overwrite_replaces_only_existing_files(self, fs):
+        #Arrange
+        content1 = b("If the implementation is hard to explain, it's a bad idea.")
+        content2 = b("You aint gonna need it.")
+
+        fs.makedir("a/b", recursive=True)
+        fs.setcontents("a/b/1.txt", content1)
+        fs.setcontents("a/2.txt", content1)
+        fs.setcontents("a/3.txt", content1)
+
+        fs.makedir("c")
+        fs.setcontents("c/3.txt", content2)
+        fs.setcontents("c/4.txt", content2)
+        #Act
+        fs.copydir("a", "c", overwrite=True)
+        #Assert
+        assert fs.exists("c/b/1.txt")
+        assert fs.exists("c/2.txt")
+        assert fs.getcontents("c/3.txt") == content1
+        assert fs.getcontents("c/4.txt") == content2
 
 
 class TestExternalDropboxFS(unittest.TestCase, FSTestCases):

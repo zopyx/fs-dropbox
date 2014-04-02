@@ -390,9 +390,47 @@ class DropboxFS(FS):
         self.client.file_copy(src, dst)
 
     def copydir(self, src, dst, *args, **kwargs):
+        """
+        Copy a folder from src to dst.
+        If the folder dst already exists you can choose overwrite,
+        which will only write over the files that already exist there.
+        The Dropbox API doesn't support this, so this has to be done in the client.
+        """
         src = abspath(normpath(src))
         dst = abspath(normpath(dst))
-        self.client.file_copy(src, dst)
+
+        def try_delete(path):
+            try:
+                self.client.file_delete(path)
+            except ResourceNotFoundError:
+                pass
+
+        def try_create(path):
+            try:
+                self.client.file_create_folder(path)
+            except DestinationExistsError:
+                pass
+
+        def get_dir_dst(path):
+            level = len(iteratepath(path))
+            if level > 1:
+                return pathcombine(dst, pathjoin(*iteratepath(path)[1:]))
+            else:
+                return dst
+
+        if kwargs.get("overwrite", False):
+            for dir_src, entries in self.walk(src):
+                dir_dst = get_dir_dst(dir_src)
+                try_create(dir_dst)
+
+                for entry in entries:
+                    entry_src = pathcombine(dir_src, entry)
+                    entry_dst = pathcombine(dir_dst, entry)
+
+                    try_delete(entry_dst)
+                    self.client.file_copy(entry_src, entry_dst)
+        else:
+            self.client.file_copy(src, dst)
 
     def move(self, src, dst, *args, **kwargs):
         src = abspath(normpath(src))
