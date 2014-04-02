@@ -175,18 +175,22 @@ class DropboxClient(client.DropboxClient):
         return dict(metadata.items())
 
     def children(self, path):
-        "Gets children of a given path."
+        """Gets children of a given path."""
         update, hash = False, None
         children = []
         try:
             metadata = super(DropboxClient, self).metadata(path, hash=hash,
                                                            include_deleted=False, list=True)
+            if not metadata.get("is_dir"):
+                raise ResourceInvalidError(path)
             contents = metadata.pop('contents')
             for child in contents:
                 if child.get('is_deleted', False):
                     continue
                 children.append(basename(child['path']))
         except rest.ErrorResponse, e:
+            if e.status == 404:
+                raise ResourceNotFoundError(path)
             if e.status != 304:
                 raise RemoteConnectionError(opname='metadata', path=path,
                                             details=e)
@@ -366,8 +370,8 @@ class DropboxFS(FS):
             return False
 
     def listdir(self, path="/", wildcard=None, full=False, absolute=False, dirs_only=False, files_only=False):
-        path = abspath(normpath(path))
-        children = self.client.children(path)
+        path = normpath(path)
+        children = self.client.children(abspath(path))
         return self._listdir_helper(path, children, wildcard, full, absolute, dirs_only, files_only)
 
     @synchronize
