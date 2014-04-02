@@ -456,7 +456,15 @@ class DropboxFS(FS):
     def movedir(self, src, dst, **kwargs):
         src = abspath(normpath(src))
         dst = abspath(normpath(dst))
-        self.client.file_move(src, dst)
+
+        if not self.exists(src):
+            raise ResourceNotFoundError(src)
+
+        if kwargs.get("overwrite", False):
+            self.copy(src, dst, **kwargs)
+            self.removedir(src)
+        else:
+            self.client.file_move(src, dst)
 
     def rename(self, src, dst, *args, **kwargs):
         src = abspath(normpath(src))
