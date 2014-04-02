@@ -319,8 +319,6 @@ class DropboxFS(FS):
         return u"<DropboxFS: >"
 
     def getmeta(self, meta_name, default=NoDefaultMeta):
-        if meta_name == 'read_only':
-            return self.read_only
         return super(DropboxFS, self).getmeta(meta_name, default)
 
     @synchronize
