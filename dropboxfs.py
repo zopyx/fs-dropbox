@@ -500,11 +500,31 @@ class DropboxFS(FS):
 
     def remove(self, path):
         path = abspath(normpath(path))
+
+        if not self.exists(path):
+            raise ResourceNotFoundError(path)
+        if not self.isfile(path):
+            raise ResourceInvalidError(path)
+
         self.client.file_delete(path)
 
-    def removedir(self, path, *args, **kwargs):
+    def removedir(self, path, recursive=False, force=False):
         path = abspath(normpath(path))
+
+        def empty_dir(dir_path):
+            return len(self.listdir(dir_path)) == 0
+
+        if not self.exists(path):
+            raise ResourceNotFoundError(path)
+        if not self.isdir(path):
+            raise ResourceInvalidError(path)
+        if not force and not empty_dir(path):
+            raise DirectoryNotEmptyError(path)
+
         self.client.file_delete(path)
+
+        if path != "/" and recursive and empty_dir(dirname(path)):
+            self.removedir(dirname(path), recursive=recursive)
 
 
 def main():
