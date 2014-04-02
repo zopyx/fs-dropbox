@@ -341,7 +341,11 @@ class DropboxFS(FS):
         return "%s in Dropbox" % path
 
     def getsyspath(self, path, allow_none=False):
-        "Returns a path as the Dropbox API specifies."
+        """Returns a path as the Dropbox API specifies.
+            Non unicode paths will explicitely converted into unicode paths,
+            as the filesystems supports those."""
+        if not isinstance(path, unicode):
+            path = unicode(path)
         if allow_none:
             return None
         return client.format_path(abspath(normpath(path)))
