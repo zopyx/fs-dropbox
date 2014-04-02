@@ -120,6 +120,8 @@ class ChunkedReader(ContextManagerStream):
         try:
             self.r = self.client.get_file(name)
         except rest.ErrorResponse, e:
+            if e.status == 404:
+                raise ResourceNotFoundError(name)
             raise RemoteConnectionError(opname='get_file', path=name,
                                         details=e)
         self.bytes = int(self.r.getheader('Content-Length'))
