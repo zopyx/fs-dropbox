@@ -1,5 +1,7 @@
 test:
-	python tests.py
+	coverage run --source dropboxfs -m py.test \
+    && echo \
+    && coverage report
 
 verify:
 	pyflakes -x W dropboxfs.py
