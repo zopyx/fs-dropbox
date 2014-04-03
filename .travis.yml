@@ -3,7 +3,7 @@ python:
   - "2.7"
 install:
   - make install
-before_script
+before_script:
   - make dev_install
 script:
   - make test
