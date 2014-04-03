@@ -93,6 +93,7 @@ class TestExternalDropboxFS(unittest.TestCase, FSTestCases):
             super(TestExternalDropboxFS, self).test_readwriteappendseek()
 
 
+@mark.skipif(reason="Otherwise the build takes too long for travis")
 class TestExternalCachedDropboxFS(TestExternalDropboxFS):
     """This will test the CacheFS wrapped around the DropboxFS implementation
     against the base tests defined in PyFilesystem"""
