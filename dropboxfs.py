@@ -465,7 +465,7 @@ class DropboxFS(FS):
 
         if kwargs.get("overwrite", False):
             self.copy(src, dst, **kwargs)
-            self.removedir(src)
+            self.removedir(src, force=True)
         else:
             self.client.file_move(src, dst)
 
