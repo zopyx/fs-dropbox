@@ -469,9 +469,29 @@ class DropboxFS(FS):
         else:
             self.client.file_move(src, dst)
 
-    def rename(self, src, dst, *args, **kwargs):
+    def rename(self, src, dst):
+        """Renames a file or directory by using the move operation of Dropbox
+        :param src: path to rename
+        :type src: string
+        :param dst: new name
+        :type dst: string
+        :raises ResourceNotFoundError: if the src path does not exist
+        :raises ParentDirectoryMissingError: if the dst directory is missing
+        :raises ResourceInvalidError: if the parent path of dst is not a directory
+        or src is a parent of dst
+        """
         src = abspath(normpath(src))
         dst = abspath(normpath(dst))
+
+        if not self.exists(src):
+            raise ResourceNotFoundError(src)
+        if not self.exists(dirname(dst)):
+            raise ParentDirectoryMissingError(dst)
+        if isprefix(src, dst):
+            raise ResourceInvalidError(dst)
+        if not self.isdir((dirname(dst))):
+            raise ResourceInvalidError(dst)
+
         self.client.file_move(src, dst)
 
     def makedir(self, path, recursive=False, allow_recreate=False):
