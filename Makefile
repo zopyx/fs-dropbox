@@ -1,5 +1,7 @@
 test:
-	python tests.py
+	coverage run --source dropboxfs -m py.test \
+    && echo \
+    && coverage report
 
 verify:
 	pyflakes -x W dropboxfs.py
@@ -7,6 +9,9 @@ verify:
 
 install:
 	python setup.py install
+
+dev_install:
+	pip install coverage pytest
 
 publish:
 	python setup.py register

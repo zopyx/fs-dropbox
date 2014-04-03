@@ -15,7 +15,7 @@ setup(
     version=versrel,
     description='A PyFilesystem backend for the Dropbox API.',
     long_description=long_description,
-    requires=[
+    install_requires=[
         'fs',
         'dropbox',
     ],
