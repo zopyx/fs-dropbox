@@ -7,14 +7,11 @@ A FS object that integrates with Dropbox.
 """
 
 import time
-import stat
 import shutil
 import optparse
 import datetime
 import tempfile
 import calendar
-import os.path
-from UserDict import UserDict
 
 from fs.base import *
 from fs.path import *

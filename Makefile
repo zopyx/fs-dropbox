@@ -11,7 +11,7 @@ install:
 	python setup.py install
 
 dev_install:
-	pip install coverage pytest six
+	pip install coverage pytest six fs dropbox
 
 publish:
 	python setup.py register
