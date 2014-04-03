@@ -519,10 +519,12 @@ class DropboxFS(FS):
             raise ResourceInvalidError(path)
         if not force and not empty_dir(path):
             raise DirectoryNotEmptyError(path)
+        if path == "/":
+            raise RemoveRootError(path)
 
         self.client.file_delete(path)
 
-        if path != "/" and recursive and empty_dir(dirname(path)):
+        if dirname(path) != "/" and recursive and empty_dir(dirname(path)):
             self.removedir(dirname(path), recursive=recursive)
 
 
