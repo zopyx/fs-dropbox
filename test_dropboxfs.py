@@ -1,17 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 import unittest
-from fs.path import pathjoin
-from fs.remote import CacheFS
 from six import b
-from pytest import fixture
-
-from fs.errors import ResourceNotFoundError, DestinationExistsError, ParentDirectoryMissingError, \
-    ResourceInvalidError, DirectoryNotEmptyError, RemoveRootError
-from fs.tests import FSTestCases
-
+from pytest import fixture, mark
 
 from dropboxfs import DropboxFS, DropboxClient
+
+from fs.tests import FSTestCases
+from fs.remote import CacheFS
 
 
 def cleanup_dropbox(fs):
@@ -84,14 +80,23 @@ class TestExternalDropboxFS(unittest.TestCase, FSTestCases):
         except UnicodeEncodeError:
             pass
 
+    @mark.xfail(reason="Truncating is not yet supported")
+    def test_truncate(self):
+            super(TestExternalDropboxFS, self).test_truncate()
 
-class TestExternalCachedDropboxFS(unittest.TestCase, FSTestCases):
+    @mark.xfail(reason="Truncating is not yet supported")
+    def test_truncate_to_larger_size(self):
+            super(TestExternalDropboxFS, self).test_truncate_to_larger_size()
+
+    @mark.xfail(reason="Concept of appending and seeking in Dropbox File is not yet supported")
+    def test_readwriteappendseek(self):
+            super(TestExternalDropboxFS, self).test_readwriteappendseek()
+
+
+class TestExternalCachedDropboxFS(TestExternalDropboxFS):
     """This will test the CacheFS wrapped around the DropboxFS implementation
     against the base tests defined in PyFilesystem"""
     def setUp(self):
-        wrapped_fs = DropboxFS("q3UFckbQggcAAAAAAAAAAdj9VvMFNx18Et2_BZLZxxLxCg6BLu3fLa15m8-qBvpB")
-        self.fs = CacheFS(wrapped_fs)
-
-    def tearDown(self):
-        cleanup_dropbox(self.fs.wrapped_fs)
-        self.fs.close()
+        """Replaces self.fs with a CacheFS wrapped around the instance"""
+        super(TestExternalCachedDropboxFS, self).setUp()
+        self.fs = CacheFS(self.fs)
