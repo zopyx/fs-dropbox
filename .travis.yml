@@ -7,3 +7,4 @@ before_script:
   - make dev_install
 script:
   - make test
+  - coveralls
