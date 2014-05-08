@@ -1,30 +1,49 @@
-#!/usr/bin/env python
+from setuptools import setup
+from setuptools.command.test import test as TestCommand
+import sys
 
-import os
-from distutils.core import setup
+tests_require = [
+    'pytest',
+    'pytest-cache',
+    'pytest-cov',
+]
 
-name = 'dropboxfs'
-version = '0.3.3'
-release = '0'
-versrel = version + '-' + release
-readme = os.path.join(os.path.dirname(__file__), 'README.rst')
-long_description = file(readme).read()
+install_requires = [
+    'fs',
+    'dropbox',
+]
+
+
+class PyTest(TestCommand):
+    def finalize_options(self):
+        TestCommand.finalize_options(self)
+        self.test_args = []
+        self.test_suite = True
+
+    def run_tests(self):
+        #import here, cause outside the eggs aren't loaded
+        import pytest
+        errno = pytest.main(self.test_args)
+        sys.exit(errno)
+
 
 setup(
-    name=name,
-    version=versrel,
+    name="pyfs-dropbox",
+    version="0.3.3",
     description='A PyFilesystem backend for the Dropbox API.',
-    long_description=long_description,
-    install_requires=[
-        'fs',
-        'dropbox',
-    ],
-    author='Ben Timby',
-    author_email='btimby@gmail.com',
-    maintainer='Ben Timby',
-    maintainer_email='btimby@gmail.com',
-    url='http://github.com/btimby/fs-dropbox/',
+    long_description=open('README.rst').read(),
+    author='Lukas Martinelli, Ben Timby',
+    author_email='me@lukasmartinelli.ch, btimby@gmail.com',
+    maintainer='Lukas Martinelli',
+    maintainer_email='me@lukasmartinelli.ch',
+    url='https://github.com/lukasmartinelli/fs-dropbox',
     license='GPLv3',
+    install_requires=install_requires,
+    extras_require={
+        'test': tests_require
+    },
+    tests_require=tests_require,
+    cmdclass={'test': PyTest},
     py_modules=['dropboxfs'],
     package_data={'': ['README.rst']},
     classifiers=(
