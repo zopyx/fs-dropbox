@@ -17,6 +17,7 @@ from fs.base import *
 from fs.path import *
 from fs.errors import *
 from fs.filelike import StringIO
+from fs.opener import Opener, _parse_credentials
 
 from dropbox import rest
 from dropbox import client
@@ -29,6 +30,61 @@ CACHE_TTL = 300
 TIME_FORMAT = '%a, %d %b %Y %H:%M:%S +0000'
 # Max size for spooling to memory before using disk (5M).
 MAX_BUFFER = 1024**2*5
+
+
+class DropboxOpener(Opener):
+    names = ['dropbox']
+    desc = """An opener for Dropbox.
+    Example (authenticates with dropbox with a username and OAUTH):
+    * dropbox://user@dropbox.com/home/path/to/folder"""
+
+    @classmethod
+    def get_fs(cls, registry, fs_name, fs_name_params, fs_path,  writeable, create_dir):
+        username, password, fs_path = _parse_credentials(fs_path)
+        fs_path = fs_path.replace("dropbox.com/home", "")
+        dropboxfs = cls.authenticate(username)
+
+        if create_dir:
+            dropboxfs.makedir(fs_path, recursive=True)
+
+        return dropboxfs, fs_path
+
+    @staticmethod
+    def authenticate(username):
+        """
+        Authenticate an a Dropbox application to access the contents of a user.
+        When the authorization workflow is done the given callback is invoked with a fully
+        initialized DropboxFS.
+        """
+        app_key = raw_input("Your Dropbox app key: ")
+        app_secret = raw_input("Your Dropbox app secret: ")
+        app_type = raw_input("Your Dropbox app access type (dropbox or app_folder): ")
+        print("APP_TYPE" + app_type)
+        token_key = raw_input("Your access token key (if you previously obtained one): ")
+        token_secret = raw_input("Your access token secret (if you previously obtained one): ")
+
+        if not app_key or not app_secret:
+            print("""You must obtain an app key and secret from Dropbox at the following URL.
+                  https://www.dropbox.com/developers/apps""")
+
+        if not token_key and not token_secret:
+            s = session.DropboxSession(app_key, app_secret, app_type)
+            t = s.obtain_request_token()
+            print("Please visit the following URL and authorize this application.\n")
+            print(s.build_authorize_url(t))
+            print("\nWhen you are done, please press <enter>.")
+            raw_input()
+            # Trade up to permanent access token.
+            a = s.obtain_access_token(t)
+            token_key, token_secret = a.key, a.secret
+            print 'Your access token will be printed below, store it for later use.'
+            print ' arguments.\n'
+            print 'Access token:', a.key
+            print 'Access token secret:', a.secret
+            print "\nWhen you are done, please press <enter>."
+            raw_input()
+
+        return DropboxFS(app_key, app_secret, app_type, token_key, token_secret)
 
 
 class ContextManagerStream(object):
@@ -543,57 +599,3 @@ class DropboxFS(FS):
 
         if dirname(path) != "/" and recursive and empty_dir(dirname(path)):
             self.removedir(dirname(path), recursive=recursive)
-
-
-def main():
-    parser = optparse.OptionParser(prog="dropboxfs", description="CLI harness for DropboxFS.")
-    parser.add_option("-k", "--app-key", help="Your Dropbox app key.")
-    parser.add_option("-s", "--app-secret", help="Your Dropbox app secret.")
-    parser.add_option("-t", "--type", default='dropbox', choices=('dropbox', 'app_folder'), help="Your Dropbox app access type.")
-    parser.add_option("-a", "--token-key", help="Your access token key (if you previously obtained one.")
-    parser.add_option("-b", "--token-secret", help="Your access token secret (if you previously obtained one.")
-
-    (options, args) = parser.parse_args()
-
-    # Can't operate without these parameters.
-    if not options.app_key or not options.app_secret:
-        parser.error('You must obtain an app key and secret from Dropbox at the following URL.\n\nhttps://www.dropbox.com/developers/apps')
-
-    # Instantiate a client one way or another.
-    if not options.token_key and not options.token_secret:
-        s = session.DropboxSession(options.app_key, options.app_secret, options.type)
-        # Get a temporary token, so we can make oAuth calls.
-        t = s.obtain_request_token()
-        print "Please visit the following URL and authorize this application.\n"
-        print s.build_authorize_url(t)
-        print "\nWhen you are done, please press <enter>."
-        raw_input()
-        # Trade up to permanent access token.
-        a = s.obtain_access_token(t)
-        token_key, token_secret = a.key, a.secret
-        print 'Your access token will be printed below, store it for later use.'
-        print 'For future accesses, you can pass the --token-key and --token-secret'
-        print ' arguments.\n'
-        print 'Access token:', a.key
-        print 'Access token secret:', a.secret
-        print "\nWhen you are done, please press <enter>."
-        raw_input()
-    elif not options.token_key or not options.token_secret:
-        parser.error('You must provide both the access token and the access token secret.')
-    else:
-        token_key, token_secret = options.token_key, options.token_secret
-
-    fs = DropboxFS(options.app_key, options.app_secret, options.type, token_key, token_secret)
-
-    print fs.getinfo('/')
-    print fs.getinfo('/Public')
-    if fs.exists('/Bar'):
-        fs.removedir('/Bar')
-    print fs.listdir('/')
-    fs.makedir('/Bar')
-    print fs.listdir('/')
-    print fs.listdir('/Foo')
-
-if __name__ == '__main__':
-    main()
-
