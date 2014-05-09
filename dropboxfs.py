@@ -38,6 +38,14 @@ class DropboxOpener(Opener):
     Example (authenticates with dropbox with a username and OAUTH):
     * dropbox://user@dropbox.com/home/path/to/folder"""
 
+    @staticmethod
+    def get_options(username):
+        return {"app_type":"auto"}
+
+    @staticmethod
+    def update_options(username, options):
+        pass
+
     @classmethod
     def get_fs(cls, registry, fs_name, fs_name_params, fs_path,  writeable, create_dir):
         username, password, fs_path = _parse_credentials(fs_path)
@@ -49,42 +57,48 @@ class DropboxOpener(Opener):
 
         return dropboxfs, fs_path
 
-    @staticmethod
-    def authenticate(username):
+    @classmethod
+    def authenticate(cls, username):
         """
         Authenticate an a Dropbox application to access the contents of a user.
         When the authorization workflow is done the given callback is invoked with a fully
         initialized DropboxFS.
         """
-        app_key = raw_input("Your Dropbox app key: ")
-        app_secret = raw_input("Your Dropbox app secret: ")
-        app_type = raw_input("Your Dropbox app access type (dropbox or app_folder): ")
-        print("APP_TYPE" + app_type)
-        token_key = raw_input("Your access token key (if you previously obtained one): ")
-        token_secret = raw_input("Your access token secret (if you previously obtained one): ")
+        options = cls.get_options(username)
+        def ask_option(key, question):
+            if key not in options:
+                options[key] = raw_input(question)
 
-        if not app_key or not app_secret:
-            print("""You must obtain an app key and secret from Dropbox at the following URL.
-                  https://www.dropbox.com/developers/apps""")
+        ask_option("app_key", "Your Dropbox app key: ")
+        ask_option("app_secret", "Your Dropbox app secret: ")
+        ask_option("app_type", "Your Dropbox app access type (dropbox or app_folder): ")
+        ask_option("token_key", "Your access token key (if you previously obtained one): ")
+        ask_option("token_secret", "Your access token secret (if you previously obtained one): ")
 
-        if not token_key and not token_secret:
-            s = session.DropboxSession(app_key, app_secret, app_type)
+        if not options["app_key"] or not options["app_secret"]:
+            print("You must obtain an app key and secret from Dropbox at the following URL:")
+            print("https://www.dropbox.com/developers/apps")
+
+        if not options["token_key"] and not options["token_secret"]:
+            s = session.DropboxSession(options["app_key"], options["app_secret"],
+                                       options["app_type"])
             t = s.obtain_request_token()
-            print("Please visit the following URL and authorize this application.\n")
+            print("Please visit the following URL and authorize this application.")
             print(s.build_authorize_url(t))
-            print("\nWhen you are done, please press <enter>.")
+            print("When you are done, please press <enter>.")
             raw_input()
             # Trade up to permanent access token.
             a = s.obtain_access_token(t)
-            token_key, token_secret = a.key, a.secret
-            print 'Your access token will be printed below, store it for later use.'
-            print ' arguments.\n'
-            print 'Access token:', a.key
-            print 'Access token secret:', a.secret
-            print "\nWhen you are done, please press <enter>."
+            options["token_key"], options["token_secret"] = a.key, a.secret
+            print('Your access token will be printed below, store it for later use.')
+            print('Access token:' + a.key)
+            print('Access token secret:' + a.secret)
+            print("When you are done, please press <enter>.")
             raw_input()
+            cls.update_options(username, options)
 
-        return DropboxFS(app_key, app_secret, app_type, token_key, token_secret)
+        return DropboxFS(options["app_key"], options["app_secret"], options["app_type"],
+                         options["token_key"], options["token_secret"])
 
 
 class ContextManagerStream(object):
