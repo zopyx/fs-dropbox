@@ -388,8 +388,23 @@ class DropboxFS(FS):
     def __unicode__(self):
         return u"<DropboxFS: >"
 
+    def hasmeta(self, meta_name):
+        if meta_name == "free_space":
+            return True
+        return super(DropboxFS, self).hasmeta(meta_name)
+
     def getmeta(self, meta_name, default=NoDefaultMeta):
+        if meta_name == "free_space":
+            max_size, cur_size = self._size_info()
+            return max_size - cur_size
+
         return super(DropboxFS, self).getmeta(meta_name, default)
+
+    def _size_info(self):
+        """Returns max_size and cur_size"""
+        info = self.client.account_info()
+        quotas = info["quota_info"]
+        return (quotas["quota"], quotas["normal"] + quotas["shared"] + quotas["datastores"])
 
     @synchronize
     def open(self, path, mode="rb", **kwargs):
